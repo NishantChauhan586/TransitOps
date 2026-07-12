@@ -4,13 +4,13 @@ import cors from 'cors';
 import morgan from 'morgan';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
-import busRoutes from './routes/busRoutes.js';
-import routeRoutes from './routes/routeRoutes.js';
-import gpsRoutes from './routes/gpsRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js';
+import vehicleRoutes from './routes/vehicleRoutes.js';
 import driverRoutes from './routes/driverRoutes.js';
-import passengerRoutes from './routes/passengerRoutes.js';
-import ticketRoutes from './routes/ticketRoutes.js';
+import tripRoutes from './routes/tripRoutes.js';
+import maintenanceRoutes from './routes/maintenanceRoutes.js';
+import expenseRoutes from './routes/expenseRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
+import reportsRoutes from './routes/reportsRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -24,13 +24,13 @@ app.use(morgan('dev'));
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/buses', busRoutes);
-app.use('/api/routes', routeRoutes);
-app.use('/api/gps', gpsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/drivers', driverRoutes);
-app.use('/api/passengers', passengerRoutes);
-app.use('/api/tickets', ticketRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/reports', reportsRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

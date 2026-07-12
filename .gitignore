@@ -1,13 +1,12 @@
-git remote add origin https://github.com/NishantChauhan586/TransitOps
-
-# Dependencies
+# === Node.js & Backend ===
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
 
-# Build outputs
-dist/
-build/
-
-# Environment variables
+# Environment files (keep secrets safe)
 .env
 .env.local
 .env.development.local
@@ -15,23 +14,26 @@ build/
 .env.production.local
 
 # Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# IDE/editor settings
-.vscode/
-.idea/
-*.swp
-
-# OS/system files
-.DS_Store
-Thumbs.db
+*.log
 
 # Coverage reports
 coverage/
 
-# Misc
+# === Frontend (Vite/React) ===
+dist/
+build/
+*.cache
+*.tmp
+
+# === IDE & Editor settings ===
+.vscode/
+.idea/
+*.swp
+
+# === OS/System files ===
+.DS_Store
+Thumbs.db
+
+# === Misc ===
 *.tgz
 *.zip

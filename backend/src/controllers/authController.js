@@ -106,3 +106,28 @@ export const getUserProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * @desc    Get all users
+ * @route   GET /api/auth/users
+ * @access  Private (Admin/Fleet Manager)
+ */
+export const getAllUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({}).select('-password');
+    res.status(200).json({ success: true, data: users });
+  } catch (error) { next(error); }
+};
+
+/**
+ * @desc    Update user role
+ * @route   PUT /api/auth/users/:id/role
+ * @access  Private
+ */
+export const updateUserRole = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true, runValidators: true }).select('-password');
+    if (!user) return res.status(404).json({ success: false, error: 'User not found' });
+    res.status(200).json({ success: true, data: user });
+  } catch (error) { next(error); }
+};

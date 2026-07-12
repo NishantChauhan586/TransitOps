@@ -1,11 +1,13 @@
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { gsap } from "gsap";
 import axios from "axios";
+import Fuse from "fuse.js";
 import {
   LayoutDashboard, Bus, Users, Ticket,
   Plus, X, ArrowRight, AlertTriangle, CheckCircle2,
   LogOut, Menu, Crown, Eye, EyeOff, Edit, Trash2,
   UserPlus, Wrench, BarChart2, ShieldCheck, Zap,
+  Truck, Route, Fuel, BarChart3, Sun, Moon, Search
 } from "lucide-react";
 
 /* ---------------------------------------------------------------
@@ -54,10 +56,22 @@ const C = {
 const GlobalStyle = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700;800;900&family=Cormorant+Garamond:wght@600;700&display=swap');
+    :root{
+      --card-bg:#ffffff;
+      --bg:#F0EEE4;
+      --text:#181C2E;
+      --border:#E7E1D2;
+    }
+    .dark{
+      --card-bg:#1f2937;
+      --bg:#0f172a;
+      --text:#ffffff;
+      --border:#374151;
+    }
     *, *::before, *::after { box-sizing: border-box; }
-    body { margin: 0; }
-    .to-root { font-family:'Inter',system-ui,sans-serif; color:${C.textPrimary}; color-scheme:light; }
-    .to-root * { color-scheme:light; }
+    body { margin: 0; background: var(--bg); }
+    .to-root { font-family:'Inter',system-ui,sans-serif; color:var(--text); color-scheme:light; }
+    .dark.to-root, .dark.to-root * { color-scheme:dark; }
     .to-root button { font-family:inherit; cursor:pointer; }
     .to-mono { font-family:'IBM Plex Mono',monospace; }
     .to-serif { font-family:'Cormorant Garamond',serif; }
@@ -94,10 +108,10 @@ const GlobalStyle = () => (
     .to-btn-primary:active:not(:disabled) { transform:translateY(0); }
     .to-btn-primary:disabled { background:#AEB4C7; border-color:transparent; cursor:not-allowed; opacity:.7; }
 
-    .to-btn-ghost { background:#fff; border:1px solid ${C.line}; color:${C.textPrimary}; transition:all .15s; }
+    .to-btn-ghost { background:var(--card-bg); border:1px solid var(--border); color:var(--text); transition:all .15s; }
     .to-btn-ghost:hover { border-color:${C.gold}; background:#FBF8EF; transform:translateY(-1px); }
 
-    .to-btn-danger { background:#fff; border:1px solid ${C.line}; color:${C.textPrimary}; transition:all .15s; }
+    .to-btn-danger { background:var(--card-bg); border:1px solid var(--border); color:var(--text); transition:all .15s; }
     .to-btn-danger:hover { border-color:${C.red}; color:${C.red}; background:${C.redSoft}; }
 
     /* Badge */
@@ -108,13 +122,24 @@ const GlobalStyle = () => (
     .to-row:hover { background:#FAF8F0; }
 
     /* Card */
-    .to-card { background:${C.surface}; border:1px solid ${C.line}; box-shadow:0 1px 2px rgba(16,27,69,.03); }
+    .to-card { background:var(--card-bg); border:1px solid var(--border); box-shadow:0 1px 2px rgba(16,27,69,.03); }
+
+    /* Dark mode overrides */
+    .dark .to-main { background:var(--bg); }
+    .dark .to-row:hover { background:rgba(255,255,255,0.05); }
+    .dark .to-table th { background:#1a2744; color:rgba(255,255,255,0.5); border-color:var(--border); }
+    .dark .to-table td { border-color:var(--border); }
+    .dark .to-card { background:var(--card-bg); border-color:var(--border); }
+    .dark .to-section-header > div > div:first-child { color:var(--text); }
+    .dark .to-btn-ghost { background:var(--card-bg); border-color:var(--border); color:var(--text); }
+    .dark .to-btn-ghost:hover { border-color:${C.gold}; background:#1f2937; }
+    .dark .to-btn-danger { background:var(--card-bg); border-color:var(--border); color:var(--text); }
 
     /* Inputs */
     input.to-input, select.to-input, textarea.to-input {
-      border:1px solid ${C.line}; border-radius:7px; padding:9px 11px;
+      border:1px solid var(--border); border-radius:7px; padding:9px 11px;
       font-size:14px; font-family:'Inter',sans-serif; width:100%;
-      outline:none; background:#fff; color:${C.textPrimary}; color-scheme:light;
+      outline:none; background:var(--card-bg); color:var(--text); color-scheme:light;
       transition:border-color .15s,box-shadow .15s;
     }
     input.to-input::placeholder, textarea.to-input::placeholder { color:#9AA3B2; }
@@ -220,13 +245,13 @@ const GlobalStyle = () => (
 --------------------------------------------------------------- */
 const NAV = [
   { key: "dashboard",   label: "Dashboard",       icon: LayoutDashboard },
-  { key: "buses",       label: "Vehicles",         icon: Bus             },
-  { key: "drivers",     label: "Drivers",          icon: Users           },
-  { key: "tickets",     label: "Trips",            icon: Ticket          },
-  { key: "maintenance", label: "Maintenance",      icon: Wrench,     disabled: true },
-  { key: "fuel",        label: "Fuel & Expenses",  icon: Zap,        disabled: true },
-  { key: "reports",     label: "Reports",          icon: BarChart2,  disabled: true },
-  { key: "compliance",  label: "Compliance",       icon: ShieldCheck, disabled: true },
+  { key: "vehicles",    label: "Vehicles",        icon: Truck           },
+  { key: "drivers",     label: "Drivers",         icon: Users           },
+  { key: "routes",      label: "Routes & Dispatch", icon: Route         },
+  { key: "maintenance", label: "Maintenance",     icon: Wrench          },
+  { key: "fuel",        label: "Expenses",        icon: Fuel            },
+  { key: "reports",     label: "Reports",         icon: BarChart2       },
+  { key: "settings",    label: "Settings",        icon: ShieldCheck     },
 ];
 
 /* ---------------------------------------------------------------
@@ -416,11 +441,23 @@ export default function TransitOpsApp() {
   const [authView,    setAuthView]    = useState("login");
 
   const [stats,      setStats]      = useState(null);
-  const [buses,      setBuses]      = useState([]);
-  const [routes,     setRoutes]     = useState([]);
+  const [vehicles,   setVehicles]   = useState([]);
   const [drivers,    setDrivers]    = useState([]);
-  const [tickets,    setTickets]    = useState([]);
+  const [trips,      setTrips]      = useState([]);
+  const [maintenance,setMaintenance]= useState([]);
+  const [expenses,   setExpenses]   = useState([]);
+  const [reportsData,setReportsData]= useState(null);
+  const [sysUsers,   setSysUsers]   = useState([]);
   const [dataLoading, setDataLoading] = useState(false);
+
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("theme") === "dark";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
 
   const [view,    setView]    = useState("dashboard");
   const [toast,   setToast]   = useState(null);
@@ -451,18 +488,24 @@ export default function TransitOpsApp() {
   const fetchAll = async () => {
     setDataLoading(true);
     try {
-      const [s, b, r, d, t] = await Promise.all([
+      const [s, v, d, t, m, e, rep, u] = await Promise.all([
         api.get("/dashboard/stats"),
-        api.get("/buses"),
-        api.get("/routes"),
+        api.get("/vehicles"),
         api.get("/drivers"),
-        api.get("/tickets"),
+        api.get("/trips"),
+        api.get("/maintenance"),
+        api.get("/expenses"),
+        api.get("/reports"),
+        api.get("/auth/users").catch(() => ({ data: [] })), // Admin only route
       ]);
       setStats(s.data);
-      setBuses(b.data);
-      setRoutes(r.data);
+      setVehicles(v.data);
       setDrivers(d.data);
-      setTickets(t.data);
+      setTrips(t.data);
+      setMaintenance(m.data);
+      setExpenses(e.data);
+      setReportsData(rep.data);
+      setSysUsers(u.data);
     } catch (err) { showToast(err.message, "err"); }
     finally { setDataLoading(false); }
   };
@@ -517,20 +560,27 @@ export default function TransitOpsApp() {
   const handleLogout = () => {
     localStorage.removeItem("transit_token");
     setToken(null); setUser(null);
-    setStats(null); setBuses([]); setRoutes([]); setDrivers([]); setTickets([]);
+    setStats(null); setVehicles([]); setDrivers([]); setTrips([]);
   };
 
   /* CRUD */
   const c = {
-    createBus:    async p => { await api.post("/buses", p);           await fetchAll(); showToast("Vehicle registered"); },
-    updateBus:    async (id, p) => { await api.put(`/buses/${id}`, p); await fetchAll(); showToast("Vehicle updated"); },
-    deleteBus:    async id => { await api.delete(`/buses/${id}`);      await fetchAll(); showToast("Vehicle deleted"); },
+    createVehicle:async p => { await api.post("/vehicles", p);           await fetchAll(); showToast("Vehicle registered"); },
+    updateVehicle:async (id, p) => { await api.put(`/vehicles/${id}`, p); await fetchAll(); showToast("Vehicle updated"); },
+    deleteVehicle:async id => { await api.delete(`/vehicles/${id}`);      await fetchAll(); showToast("Vehicle deleted"); },
     createDriver: async p => { await api.post("/drivers", p);           await fetchAll(); showToast("Driver added"); },
     updateDriver: async (id, p) => { await api.put(`/drivers/${id}`, p); await fetchAll(); showToast("Driver updated"); },
     deleteDriver: async id => { await api.delete(`/drivers/${id}`);      await fetchAll(); showToast("Driver deleted"); },
-    createTicket: async p => { await api.post("/tickets", p);            await fetchAll(); showToast("Trip booked"); },
-    updateTicket: async (id, p) => { await api.put(`/tickets/${id}`, p); await fetchAll(); showToast("Trip updated"); },
-    deleteTicket: async id => { await api.delete(`/tickets/${id}`);      await fetchAll(); showToast("Trip deleted"); },
+    createTrip:   async p => { await api.post("/trips", p);              await fetchAll(); showToast("Trip dispatched"); },
+    updateTrip:   async (id, p) => { await api.put(`/trips/${id}`, p);   await fetchAll(); showToast("Trip updated"); },
+    deleteTrip:   async id => { await api.delete(`/trips/${id}`);        await fetchAll(); showToast("Trip deleted"); },
+    createMaint:  async p => { await api.post("/maintenance", p);        await fetchAll(); showToast("Log added"); },
+    updateMaint:  async (id, p) => { await api.put(`/maintenance/${id}`, p); await fetchAll(); showToast("Log updated"); },
+    deleteMaint:  async id => { await api.delete(`/maintenance/${id}`);  await fetchAll(); showToast("Log deleted"); },
+    createExp:    async p => { await api.post("/expenses", p);           await fetchAll(); showToast("Expense added"); },
+    updateExp:    async (id, p) => { await api.put(`/expenses/${id}`, p); await fetchAll(); showToast("Expense updated"); },
+    deleteExp:    async id => { await api.delete(`/expenses/${id}`);     await fetchAll(); showToast("Expense deleted"); },
+    updateUser:   async (id, r) => { await api.put(`/auth/users/${id}/role`, { role: r }); await fetchAll(); showToast("Role updated"); },
   };
 
   const del = (fn, id, msg) => async () => {
@@ -540,7 +590,7 @@ export default function TransitOpsApp() {
 
   /* Loading */
   if (authLoading) return (
-    <div className="to-root" style={{ minHeight: "100vh", background: C.royal, display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div className={`to-root ${darkMode ? "dark" : ""}`} style={{ minHeight: "100vh", background: C.royal, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <GlobalStyle /><Spinner />
     </div>
   );
@@ -552,7 +602,7 @@ export default function TransitOpsApp() {
   }
 
   return (
-    <div className="to-root to-fade-in to-shell">
+    <div className={`to-root to-fade-in to-shell${darkMode ? " dark" : ""}`}>
       <GlobalStyle />
 
       {/* Mobile topbar */}
@@ -592,6 +642,23 @@ export default function TransitOpsApp() {
           })}
         </div>
 
+        {/* Dark Mode Toggle */}
+        <div style={{ padding: "6px 8px" }}>
+          <button
+            onClick={() => setDarkMode(dm => !dm)}
+            style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              padding: "9px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              background: darkMode ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.07)",
+              color: "rgba(255,255,255,0.8)", fontSize: 12.5, fontWeight: 600,
+              transition: "background 0.2s",
+            }}
+          >
+            {darkMode ? <Sun size={14} color="#F5C842" /> : <Moon size={14} color="#8A95B8" />}
+            {darkMode ? "Light Mode" : "Dark Mode"}
+          </button>
+        </div>
+
         {/* User footer */}
         <div style={{ padding: "10px 14px 14px", borderTop: `1px solid ${C.royalLine}` }}>
           <div style={{ fontSize: 12, color: "#fff", fontWeight: 700 }}>{user.name}</div>
@@ -620,18 +687,21 @@ export default function TransitOpsApp() {
           </div>
         )}
 
-        {view === "dashboard"   && <DashboardView stats={stats} drivers={drivers} buses={buses} tickets={tickets} routes={routes} user={user} loading={dataLoading} />}
-        {view === "buses"       && <BusesView buses={buses} routes={routes} crud={c} setModal={setModal} showToast={showToast} loading={dataLoading} del={del} />}
-        {view === "drivers"     && <DriversView drivers={drivers} crud={c} setModal={setModal} showToast={showToast} loading={dataLoading} del={del} />}
-        {view === "tickets"     && <TicketsView tickets={tickets} buses={buses} routes={routes} crud={c} setModal={setModal} showToast={showToast} loading={dataLoading} del={del} />}
-
+        {view === "dashboard"   && <DashboardView stats={stats} drivers={drivers} vehicles={vehicles} trips={trips} user={user} loading={dataLoading} />}
+        {view === "vehicles"    && <VehiclesView vehicles={vehicles} crud={c} setModal={setModal} loading={dataLoading} del={del} />}
+        {view === "drivers"     && <DriversView drivers={drivers} crud={c} setModal={setModal} loading={dataLoading} del={del} />}
+        {view === "routes"      && <RoutesView trips={trips} vehicles={vehicles} drivers={drivers} crud={c} setModal={setModal} loading={dataLoading} del={del} />}
+        {view === "maintenance" && <MaintenanceView logs={maintenance} vehicles={vehicles} crud={c} setModal={setModal} loading={dataLoading} del={del} />}
+        {view === "fuel"        && <FuelView expenses={expenses} vehicles={vehicles} crud={c} setModal={setModal} loading={dataLoading} del={del} />}
+        {view === "reports"     && <ReportsView data={reportsData} loading={dataLoading} />}
+        {view === "settings"    && <SettingsView users={sysUsers} user={user} crud={c} loading={dataLoading} />}
       </div>
 
       {/* Modals */}
-      {modal?.type === "bus-form" && (
+      {modal?.type === "vehicle-form" && (
         <Modal title={modal.data ? "Edit Vehicle" : "Register Vehicle"} onClose={() => setModal(null)} width={520}>
-          <BusForm initial={modal.data} routes={routes}
-            onSubmit={async p => { try { modal.data ? await c.updateBus(modal.data._id, p) : await c.createBus(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
+          <VehicleForm initial={modal.data}
+            onSubmit={async p => { try { modal.data ? await c.updateVehicle(modal.data._id, p) : await c.createVehicle(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
         </Modal>
       )}
       {modal?.type === "driver-form" && (
@@ -640,10 +710,28 @@ export default function TransitOpsApp() {
             onSubmit={async p => { try { modal.data ? await c.updateDriver(modal.data._id, p) : await c.createDriver(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
         </Modal>
       )}
-      {modal?.type === "ticket-form" && (
-        <Modal title={modal.data ? "Edit Trip" : "Book Trip"} onClose={() => setModal(null)} width={560}>
-          <TicketForm initial={modal.data} buses={buses} routes={routes}
-            onSubmit={async p => { try { modal.data ? await c.updateTicket(modal.data._id, p) : await c.createTicket(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
+      {modal?.type === "trip-form" && (
+        <Modal title={modal.data ? "Edit Trip" : "Dispatch Trip"} onClose={() => setModal(null)} width={560}>
+          <TripForm initial={modal.data} vehicles={vehicles} drivers={drivers}
+            onSubmit={async p => { try { modal.data ? await c.updateTrip(modal.data._id, p) : await c.createTrip(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
+        </Modal>
+      )}
+      {modal?.type === "trip-complete" && (
+        <Modal title="Complete Trip" onClose={() => setModal(null)} width={400}>
+          <TripCompleteForm initial={modal.data}
+            onSubmit={async p => { try { await c.updateTrip(modal.data._id, { ...p, status: "Completed" }); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
+        </Modal>
+      )}
+      {modal?.type === "maint-form" && (
+        <Modal title={modal.data ? "Edit Maintenance Log" : "New Maintenance Log"} onClose={() => setModal(null)}>
+          <MaintenanceForm initial={modal.data} vehicles={vehicles}
+            onSubmit={async p => { try { modal.data ? await c.updateMaint(modal.data._id, p) : await c.createMaint(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
+        </Modal>
+      )}
+      {modal?.type === "fuel-form" && (
+        <Modal title={modal.data ? "Edit Expense" : "Log Expense"} onClose={() => setModal(null)}>
+          <FuelForm initial={modal.data} vehicles={vehicles}
+            onSubmit={async p => { try { modal.data ? await c.updateExp(modal.data._id, p) : await c.createExp(p); setModal(null); } catch (e) { showToast(e.message, "err"); } }} />
         </Modal>
       )}
     </div>
@@ -841,32 +929,12 @@ function SignupView({ loginRef, onRegister, onSwitch }) {
 /* ---------------------------------------------------------------
    Dashboard
 --------------------------------------------------------------- */
-function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }) {
+function DashboardView({ stats, drivers, vehicles, trips, user, loading }) {
   if (loading || !stats) return <LoadingBlock />;
 
-  const driversOnDuty  = drivers.filter(d => d.status === "On Trip").length;
-  const activeTrips    = tickets.filter(t => t.status === "Booked").length;
-  const pendingTrips   = tickets.filter(t => t.status !== "Booked" && t.status !== "Completed" && t.status !== "Cancelled").length;
-  const fleetUtil      = stats.totalBuses > 0 ? Math.round((stats.activeBuses / stats.totalBuses) * 100) : 0;
-
-  const recentTrips = [...tickets]
-    .sort((a, b) => new Date(b.bookingDate || b.createdAt) - new Date(a.bookingDate || a.createdAt))
+  const recentTrips = [...trips]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 6);
-
-  // Donut segments based on fleet region
-  const byRegion = stats.byRegion || {};
-  const regionTotal = Object.values(byRegion).reduce((a, v) => a + v, 0) || 1;
-  const REGION_COLORS = { East: C.green, North: C.royalMid, South: C.royal, West: C.gold };
-  const donutData = Object.entries(byRegion)
-    .map(([label, count]) => ({ label, pct: Math.round((count / regionTotal) * 100), color: REGION_COLORS[label] || C.neutral }))
-    .filter(s => s.pct > 0);
-
-  // Ensure exactly 100%
-  if (donutData.length === 0) donutData.push({ label: "No data", pct: 100, color: C.neutral });
-  else {
-    const diff = 100 - donutData.reduce((a, s) => a + s.pct, 0);
-    if (diff !== 0) donutData[0].pct += diff;
-  }
 
   const roleLabel = user?.role
     ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
@@ -878,13 +946,13 @@ function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }
 
       {/* KPI row */}
       <div className="to-kpi-row">
-        <KPITile label="ACTIVE VEHICLES"  value={stats.activeBuses} />
-        <KPITile label="AVAILABLE"        value={stats.activeBuses - driversOnDuty < 0 ? 0 : stats.activeBuses - driversOnDuty} />
-        <KPITile label="IN MAINTENANCE"   value={stats.maintenanceBuses} />
-        <KPITile label="ACTIVE TRIPS"     value={activeTrips} />
-        <KPITile label="PENDING TRIPS"    value={pendingTrips} />
-        <KPITile label="DRIVERS ON DUTY"  value={driversOnDuty} />
-        <KPITile label="FLEET UTILIZATION" value={fleetUtil} suffix="%" />
+        <KPITile label="ACTIVE VEHICLES"  value={stats.activeVehicles} />
+        <KPITile label="AVAILABLE"        value={stats.availableVehicles} />
+        <KPITile label="IN SHOP"          value={stats.inShopVehicles} />
+        <KPITile label="ACTIVE TRIPS"     value={stats.activeTrips} />
+        <KPITile label="PENDING TRIPS"    value={stats.pendingTrips} />
+        <KPITile label="DRIVERS ON DUTY"  value={stats.driversOnDuty} />
+        <KPITile label="UTILIZATION"      value={stats.fleetUtilization} suffix="%" />
       </div>
 
       {/* Two-column grid */}
@@ -893,17 +961,12 @@ function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }
         <div className="to-card" style={{ borderRadius: 10, padding: 20 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 14 }}>Recent trips</div>
           {recentTrips.length === 0 ? (
-            <EmptyState text="No trips found. Book your first trip." />
+            <EmptyState text="No trips found. Dispatch your first cargo trip." />
           ) : (
             <div>
               {recentTrips.map((t, i) => {
-                const bus   = buses.find(b => b._id === (t.bus?._id || t.bus));
-                const route = routes.find(r => r._id === (t.route?._id || t.route));
-                const from  = route?.source || bus?.busNumber || "Origin";
-                const to    = route?.destination || bus?.busName || "Destination";
-                const label = t.status === "Booked" ? "Booked"
-                  : t.status === "Completed" ? "Completed"
-                  : t.status === "Cancelled" ? "Cancelled" : "Draft";
+                const v = vehicles.find(v => v._id === (t.vehicle?._id || t.vehicle));
+                const d = drivers.find(d => d._id === (t.driver?._id || t.driver));
                 return (
                   <div key={t._id || i} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -911,13 +974,13 @@ function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }
                   }}>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 600 }}>
-                        {from} <ArrowRight size={11} style={{ display: "inline", verticalAlign: "middle", margin: "0 2px" }} /> {to}
+                        {t.source} <ArrowRight size={11} style={{ display: "inline", verticalAlign: "middle", margin: "0 2px" }} /> {t.destination}
                       </div>
                       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
-                        {t.passenger?.name || "Passenger"} · Seat {t.seatNumber} · ₹{t.fare}
+                        {v?.registrationNumber || "Vehicle"} · {d?.name || "Driver"} · {t.cargoWeight}kg
                       </div>
                     </div>
-                    <StatusBadge status={label} />
+                    <StatusBadge status={t.status} />
                   </div>
                 );
               })}
@@ -925,11 +988,11 @@ function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }
           )}
         </div>
 
-        {/* Fleet by region */}
+        {/* Fleet Utilization spacer/future chart */}
         <div className="to-card" style={{ borderRadius: 10, padding: 20 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 16 }}>Fleet by region</div>
-          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0" }}>
-            <DonutChart segments={donutData} />
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 16 }}>Operational Overview</div>
+          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0", color: C.textMuted, fontSize: 12, textAlign: 'center' }}>
+            Cargo Fleet metrics running smoothly.<br/>Check Reports for detailed analytics.
           </div>
         </div>
       </div>
@@ -940,53 +1003,102 @@ function DashboardView({ stats, drivers, buses, tickets, routes, user, loading }
 /* ---------------------------------------------------------------
    Vehicles View
 --------------------------------------------------------------- */
-function BusesView({ buses, routes, crud, setModal, showToast, loading, del }) {
+function VehiclesView({ vehicles, crud, setModal, loading, del }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const filteredVehicles = React.useMemo(() => {
+    let data = [...vehicles];
+    
+    // Fuzzy Search
+    if (search.trim()) {
+      const fuse = new Fuse(data, {
+        keys: ["registrationNumber", "model", "type"],
+        threshold: 0.3,
+      });
+      data = fuse.search(search).map(res => res.item);
+    }
+    
+    if (filter !== "All") {
+      data = data.filter(v => v.status === filter);
+    }
+    return data.sort((a, b) => (a.model || "").localeCompare(b.model || ""));
+  }, [vehicles, search, filter]);
+
+  const statusColors = {
+    Available: { bg: "#D1FAE5", fg: "#065F46" },
+    "On Trip": { bg: "#FEF3C7", fg: "#92400E" },
+    "In Shop": { bg: "#FEE2E2", fg: "#991B1B" },
+    Retired:   { bg: "#F3F4F6", fg: "#374151" }
+  };
+
+  if (loading) return <Spinner />;
+
   return (
-    <div>
-      <SectionHeader title="Vehicles" subtitle={`${buses.length} vehicles registered`}
-        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "bus-form", data: null })}>Add Vehicle</ActionButton>} />
-      {loading ? <LoadingBlock /> : (
-        <div className="to-card to-table-wrap" style={{ borderRadius: 10 }}>
-          <table className="to-table">
-            <thead><tr>
-              {["Bus No.", "Name", "Capacity", "Driver", "Route", "Region", "Status", "Actions"].map(h => <th key={h}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {buses.length === 0
-                ? <tr><td colSpan={7}><EmptyState text="No vehicles. Click Add Vehicle." /></td></tr>
-                : buses.map(b => {
-                    const rt = routes.find(r => r._id === (b.route?._id || b.route));
-                    return (
-                      <tr key={b._id} className="to-row">
-                        <td className="to-mono"><strong>{b.busNumber}</strong></td>
-                        <td>{b.busName}</td>
-                        <td>{b.capacity} seats</td>
-                        <td>
-                          <div style={{ fontWeight: 600 }}>{b.driverName || "—"}</div>
-                          {b.driverPhone && <div style={{ fontSize: 10.5, color: C.textMuted }}>{b.driverPhone}</div>}
-                        </td>
-                        <td>{rt ? <span style={{ color: C.royalMid, fontWeight: 600 }}>{rt.routeNumber}</span> : <span style={{ color: C.textMuted }}>—</span>}</td>
-                        <td>
-                          {b.region && (
-                            <span className="to-badge" style={{
-                              padding: "3px 8px", borderRadius: 999,
-                              background: { East: C.greenSoft, North: C.blueSoft, South: C.neutral, West: C.goldSoft }[b.region] || C.neutral,
-                              color: { East: C.green, North: C.blue, South: C.textMuted, West: C.goldDeep }[b.region] || C.textMuted,
-                            }}>{b.region}</span>
-                          )}
-                        </td>
-                        <td><StatusBadge status={b.status} /></td>
-                        <td>
-                          <div style={{ display: "flex", gap: 5 }}>
-                            <button className="to-btn-ghost" onClick={() => setModal({ type: "bus-form", data: b })} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Edit size={12} /></button>
-                            <button className="to-btn-danger" onClick={del(crud.deleteBus, b._id, "Delete this vehicle?")} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Trash2 size={12} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-            </tbody>
-          </table>
+    <div className="to-fade-in">
+      <SectionHeader
+        title="Vehicles"
+        subtitle={`${vehicles.length} vehicles registered in fleet`}
+        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "vehicle-form", data: null })}>Add Vehicle</ActionButton>}
+      />
+      
+      {/* Search + Filter bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border)" }}>
+        <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, padding: "0 10px", background: "var(--card-bg)" }}>
+          <Search size={15} style={{ opacity: 0.45, flexShrink: 0, color: "var(--text)" }} />
+          <input
+            type="text"
+            placeholder="Search by registration, model, or type..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", padding: "9px 8px", width: "100%", color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}>
+          <option value="All">All Status</option>
+          <option value="Available">Available</option>
+          <option value="On Trip">On Trip</option>
+          <option value="In Shop">In Shop</option>
+          <option value="Retired">Retired</option>
+        </select>
+      </div>
+
+      {/* Cards */}
+      {filteredVehicles.length === 0 ? (
+        <EmptyState text="No vehicles match your search or filters." />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {filteredVehicles.map(v => {
+            const sc = statusColors[v.status] || statusColors.Retired;
+            return (
+              <div key={v._id} className="to-card" style={{ borderRadius: 10, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{v.registrationNumber}</div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{v.model} &bull; {v.type}</div>
+                  </div>
+                  <span style={{ background: sc.bg, color: sc.fg, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.4px" }}>
+                    {(v.status || "UNKNOWN").toUpperCase()}
+                  </span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, color: C.textMuted, marginBottom: 16, padding: "12px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Capacity:</span><br/>{v.maxLoadCapacity} kg</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Odometer:</span><br/>{v.odometer.toLocaleString()} km</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Acq. Cost:</span><br/>₹{v.acquisitionCost.toLocaleString()}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button className="to-btn-ghost" onClick={() => setModal({ type: "vehicle-form", data: v })} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <button className="to-btn-danger" onClick={del(crud.deleteVehicle, v._id, "Delete this vehicle?")} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -996,44 +1108,113 @@ function BusesView({ buses, routes, crud, setModal, showToast, loading, del }) {
 /* ---------------------------------------------------------------
    Drivers View
 --------------------------------------------------------------- */
+/* ---------------------------------------------------------------
+   Drivers View
+--------------------------------------------------------------- */
 function DriversView({ drivers, crud, setModal, loading, del }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const filteredDrivers = React.useMemo(() => {
+    let data = [...drivers];
+    
+    if (search.trim()) {
+      const fuse = new Fuse(data, {
+        keys: ["name", "licenseNumber", "contactNumber"],
+        threshold: 0.3,
+      });
+      data = fuse.search(search).map(res => res.item);
+    }
+    
+    if (filter !== "All") {
+      data = data.filter(d => d.status === filter);
+    }
+    return data.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [drivers, search, filter]);
+
+  const statusColors = {
+    Available: { bg: "#D1FAE5", fg: "#065F46" },
+    "On Trip": { bg: "#FEF3C7", fg: "#92400E" },
+    Suspended: { bg: "#FEE2E2", fg: "#991B1B" },
+    "Off Duty":{ bg: "#F3F4F6", fg: "#374151" }
+  };
+
+  if (loading) return <Spinner />;
+
   return (
-    <div>
-      <SectionHeader title="Drivers" subtitle={`${drivers.length} drivers on record`}
-        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "driver-form", data: null })}>Add Driver</ActionButton>} />
-      {loading ? <LoadingBlock /> : (
-        <div className="to-card to-table-wrap" style={{ borderRadius: 10 }}>
-          <table className="to-table">
-            <thead><tr>
-              {["Name", "License No.", "Category", "Expiry", "Contact", "Safety Score", "Status", "Actions"].map(h => <th key={h}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {drivers.length === 0
-                ? <tr><td colSpan={8}><EmptyState text="No drivers. Click Add Driver." /></td></tr>
-                : drivers.map(d => {
-                    const days = daysUntil(d.licenseExpiry);
-                    return (
-                      <tr key={d._id} className="to-row">
-                        <td style={{ fontWeight: 600 }}>{d.name}</td>
-                        <td className="to-mono">{d.licenseNumber}</td>
-                        <td>{d.licenseCategory}</td>
-                        <td style={{ color: days < 0 ? C.red : days <= 30 ? C.goldDeep : C.textPrimary, whiteSpace: "nowrap" }}>
-                          {fmtDate(d.licenseExpiry)}{days < 0 ? " (exp.)" : days <= 30 ? ` (${days}d)` : ""}
-                        </td>
-                        <td>{d.contactNumber}</td>
-                        <td><span style={{ fontWeight: 700, color: d.safetyScore >= 80 ? C.green : d.safetyScore >= 60 ? C.goldDeep : C.red }}>{d.safetyScore}</span></td>
-                        <td><StatusBadge status={d.status} /></td>
-                        <td>
-                          <div style={{ display: "flex", gap: 5 }}>
-                            <button className="to-btn-ghost" onClick={() => setModal({ type: "driver-form", data: d })} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Edit size={12} /></button>
-                            <button className="to-btn-danger" onClick={del(crud.deleteDriver, d._id, "Delete this driver?")} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Trash2 size={12} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-            </tbody>
-          </table>
+    <div className="to-fade-in">
+      <SectionHeader
+        title="Drivers"
+        subtitle={`${drivers.length} drivers on record`}
+        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "driver-form", data: null })}>Add Driver</ActionButton>}
+      />
+      
+      {/* Search + Filter bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border)" }}>
+        <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, padding: "0 10px", background: "var(--card-bg)" }}>
+          <Search size={15} style={{ opacity: 0.45, flexShrink: 0, color: "var(--text)" }} />
+          <input
+            type="text"
+            placeholder="Search by name, license no, or contact..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", padding: "9px 8px", width: "100%", color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}>
+          <option value="All">All Status</option>
+          <option value="Available">Available</option>
+          <option value="On Trip">On Trip</option>
+          <option value="Suspended">Suspended</option>
+          <option value="Off Duty">Off Duty</option>
+        </select>
+      </div>
+
+      {/* Cards */}
+      {filteredDrivers.length === 0 ? (
+        <EmptyState text="No drivers match your search or filters." />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {filteredDrivers.map(d => {
+            const sc = statusColors[d.status] || statusColors["Off Duty"];
+            const days = daysUntil(d.licenseExpiry);
+            const expColor = days < 0 ? C.red : days <= 30 ? C.goldDeep : C.textPrimary;
+            const expText = days < 0 ? " (Expired)" : days <= 30 ? ` (${days}d)` : "";
+            
+            return (
+              <div key={d._id} className="to-card" style={{ borderRadius: 10, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{d.name}</div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{d.licenseNumber} &bull; {d.licenseCategory}</div>
+                  </div>
+                  <span style={{ background: sc.bg, color: sc.fg, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.4px" }}>
+                    {(d.status || "UNKNOWN").toUpperCase()}
+                  </span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, color: C.textMuted, marginBottom: 16, padding: "12px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+                  <div>
+                    <span style={{ fontWeight: 600, color: "var(--text)" }}>License Expiry:</span><br/>
+                    <span style={{ color: expColor, fontWeight: days <= 30 ? 700 : 400 }}>{fmtDate(d.licenseExpiry)}{expText}</span>
+                  </div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Contact:</span><br/>{d.contactNumber || "—"}</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Safety Score:</span><br/>
+                    <span style={{ fontWeight: 700, color: d.safetyScore >= 80 ? C.green : d.safetyScore >= 60 ? C.goldDeep : C.red }}>{d.safetyScore}/100</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button className="to-btn-ghost" onClick={() => setModal({ type: "driver-form", data: d })} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <button className="to-btn-danger" onClick={del(crud.deleteDriver, d._id, "Delete this driver?")} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1041,42 +1222,117 @@ function DriversView({ drivers, crud, setModal, loading, del }) {
 }
 
 /* ---------------------------------------------------------------
-   Trips View
+   Routes View
 --------------------------------------------------------------- */
-function TicketsView({ tickets, buses, routes, crud, setModal, loading, del }) {
+function RoutesView({ trips, vehicles, drivers, crud, setModal, loading, del }) {
+  const [routeSearch, setRouteSearch] = React.useState("");
+  const [statusFilter, setStatusFilter] = React.useState("All");
+
+  const filteredTrips = React.useMemo(() => {
+    let data = [...trips];
+    if (routeSearch.trim()) {
+      data = data.filter(t =>
+        (t.source || "").toLowerCase().includes(routeSearch.toLowerCase()) ||
+        (t.destination || "").toLowerCase().includes(routeSearch.toLowerCase()) ||
+        (t.tripNo || "").toLowerCase().includes(routeSearch.toLowerCase())
+      );
+    }
+    if (statusFilter !== "All") data = data.filter(t => t.status === statusFilter);
+    return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [trips, routeSearch, statusFilter]);
+
+  const statusColors = {
+    Draft:     { bg: "#F3F4F6", fg: "#374151" },
+    Dispatched:{ bg: "#FEF3C7", fg: "#92400E" },
+    Completed: { bg: "#D1FAE5", fg: "#065F46" },
+    Cancelled: { bg: "#FEE2E2", fg: "#991B1B" },
+  };
+
+  if (loading) return <Spinner />;
+
   return (
-    <div>
-      <SectionHeader title="Trips" subtitle={`${tickets.length} trips on record`}
-        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "ticket-form", data: null })}>Book Trip</ActionButton>} />
-      {loading ? <LoadingBlock /> : (
-        <div className="to-card to-table-wrap" style={{ borderRadius: 10 }}>
-          <table className="to-table">
-            <thead><tr>
-              {["Ticket No.", "Bus", "Route", "Seat", "Fare", "Travel Date", "Status", "Payment", "Actions"].map(h => <th key={h}>{h}</th>)}
-            </tr></thead>
-            <tbody>
-              {tickets.length === 0
-                ? <tr><td colSpan={9}><EmptyState text="No trips booked. Click Book Trip." /></td></tr>
-                : tickets.map(t => (
-                    <tr key={t._id} className="to-row">
-                      <td className="to-mono"><strong>{t.ticketNo}</strong></td>
-                      <td>{t.bus?.busNumber || "—"}</td>
-                      <td>{t.route?.routeNumber || "—"}</td>
-                      <td className="to-mono">{t.seatNumber}</td>
-                      <td>₹{t.fare}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>{fmtDate(t.travelDate)}</td>
-                      <td><StatusBadge status={t.status} /></td>
-                      <td><StatusBadge status={t.paymentStatus} /></td>
-                      <td>
-                        <div style={{ display: "flex", gap: 5 }}>
-                          <button className="to-btn-ghost" onClick={() => setModal({ type: "ticket-form", data: t })} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Edit size={12} /></button>
-                          <button className="to-btn-danger" onClick={del(crud.deleteTicket, t._id, "Delete this trip?")} style={{ padding: "4px 7px", borderRadius: 5, display: "flex" }}><Trash2 size={12} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
+    <div className="to-fade-in">
+      <SectionHeader
+        title="Routes & Dispatch"
+        subtitle={`${trips.length} total routes dispatched`}
+        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "trip-form", data: null })}>Dispatch Route</ActionButton>}
+      />
+
+      {/* Search + Filter bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border)" }}>
+        <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, padding: "0 10px", background: "var(--card-bg)" }}>
+          <Search size={15} style={{ opacity: 0.45, flexShrink: 0, color: "var(--text)" }} />
+          <input
+            type="text"
+            placeholder="Search by origin, destination, or trip no…"
+            value={routeSearch}
+            onChange={e => setRouteSearch(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", padding: "9px 8px", width: "100%", color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}
+        >
+          <option value="All">All Status</option>
+          <option value="Draft">Draft</option>
+          <option value="Dispatched">Dispatched</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+
+      {/* Route cards */}
+      {filteredTrips.length === 0 ? (
+        <EmptyState text="No routes match your search or filters." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {filteredTrips.map(t => {
+            const sc = statusColors[t.status] || statusColors.Draft;
+            const vehicle = typeof t.vehicle === "object" ? t.vehicle : vehicles.find(v => v._id === t.vehicle);
+            const driver = typeof t.driver === "object" ? t.driver : drivers.find(d => d._id === t.driver);
+            return (
+              <div key={t._id} className="to-card" style={{ borderRadius: 10, padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                  {/* Route path */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 200 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{t.source || "—"}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, color: C.gold }}>
+                      <div style={{ height: 2, width: 24, background: C.gold, borderRadius: 2 }} />
+                      <Route size={14} />
+                      <div style={{ height: 2, width: 24, background: C.gold, borderRadius: 2 }} />
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{t.destination || "—"}</div>
+                  </div>
+
+                  {/* Actions & Badge */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <span style={{ background: sc.bg, color: sc.fg, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.4px" }}>
+                      {(t.status || "UNKNOWN").toUpperCase()}
+                    </span>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {t.status === "Dispatched" && (
+                        <button className="to-btn-primary" onClick={() => setModal({ type: "trip-complete", data: t })} style={{ padding: "5px 10px", borderRadius: 6, display: "flex", fontSize: 11, fontWeight: 700 }}>Complete</button>
+                      )}
+                      <button className="to-btn-ghost" onClick={() => setModal({ type: "trip-form", data: t })} style={{ padding: "5px 8px", borderRadius: 6, display: "flex" }}><Edit size={13} /></button>
+                      <button className="to-btn-danger" onClick={del(crud.deleteTrip, t._id, "Delete this route?")} style={{ padding: "5px 8px", borderRadius: 6, display: "flex" }}><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Meta row */}
+                <div style={{ display: "flex", gap: 24, marginTop: 16, flexWrap: "wrap", fontSize: 13, color: C.textMuted }}>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Trip No:</span> {t.tripNo || "—"}</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Vehicle:</span> {vehicle?.registrationNumber || "—"}</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Driver:</span> {driver?.name || "—"}</div>
+                  {t.scheduledDate && <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Scheduled:</span> {fmtDate(t.scheduledDate)}</div>}
+                  {t.estimatedDistance && <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Distance:</span> {t.estimatedDistance} km</div>}
+                  {t.cargoWeight && <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Cargo:</span> {t.cargoWeight} kg</div>}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1104,46 +1360,49 @@ function SubmitBtn({ loading, label, icon: Icon }) {
   );
 }
 
-function BusForm({ initial, routes, onSubmit }) {
+function VehicleForm({ initial, onSubmit }) {
   const [f, , set, setN] = useForm({
-    busNumber:   initial?.busNumber   || "",
-    busName:     initial?.busName     || "",
-    capacity:    initial?.capacity    || 35,
-    driverName:  initial?.driverName  || "",
-    driverPhone: initial?.driverPhone || "",
-    route:       initial?.route?._id  || initial?.route || "",
-    region:      initial?.region      || "North",
-    status:      initial?.status      || "Active",
+    registrationNumber: initial?.registrationNumber || "",
+    model:              initial?.model || "",
+    type:               initial?.type || "Box Truck",
+    maxLoadCapacity:    initial?.maxLoadCapacity || 0,
+    odometer:           initial?.odometer || 0,
+    acquisitionCost:    initial?.acquisitionCost || 0,
+    status:             initial?.status || "Available",
   });
   const [loading, setLoading] = useState(false);
   const submit = async e => { e.preventDefault(); setLoading(true); await onSubmit(f); setLoading(false); };
   return (
     <form onSubmit={submit}>
       <div className="to-grid-2">
-        <Field label="Bus Number" required><input className="to-input" value={f.busNumber} onChange={set("busNumber")} placeholder="MH-12-AB-1234" /></Field>
-        <Field label="Vehicle Name" required><input className="to-input" value={f.busName} onChange={set("busName")} placeholder="Metro Express" /></Field>
-      </div>
-      <div className="to-grid-2">
-        <Field label="Capacity (seats)" required><input className="to-input" type="number" min={1} value={f.capacity} onChange={setN("capacity")} /></Field>
-        <Field label="Status">
-          <select className="to-input" value={f.status} onChange={set("status")}>
-            {["Active", "Inactive", "Maintenance"].map(s => <option key={s}>{s}</option>)}
-          </select>
+        <Field label="Registration Number" required>
+          <input className="to-input" value={f.registrationNumber} onChange={set("registrationNumber")} placeholder="e.g. MH-12-AB-1234" pattern="^[A-Z0-9-]{6,15}$" title="Alphanumeric with hyphens (e.g., MH-12-AB-1234)" required />
+        </Field>
+        <Field label="Vehicle Model" required>
+          <input className="to-input" value={f.model} onChange={set("model")} placeholder="e.g. Volvo VNL 860" minLength={2} maxLength={50} required />
         </Field>
       </div>
       <div className="to-grid-2">
-        <Field label="Region">
-          <select className="to-input" value={f.region} onChange={set("region")}>
-            {["East", "North", "South", "West"].map(r => <option key={r}>{r}</option>)}
+        <Field label="Vehicle Type">
+          <select className="to-input" value={f.type} onChange={set("type")}>
+            {["Van", "Box Truck", "Flatbed", "Reefer"].map(s => <option key={s}>{s}</option>)}
           </select>
         </Field>
-        <Field label="Driver Name"><input className="to-input" value={f.driverName} onChange={set("driverName")} /></Field>
+        <Field label="Max Load Capacity (kg)" required>
+          <input className="to-input" type="number" min={100} max={50000} value={f.maxLoadCapacity} onChange={setN("maxLoadCapacity")} placeholder="e.g. 5000" required />
+        </Field>
       </div>
-      <Field label="Driver Phone"><input className="to-input" value={f.driverPhone} onChange={set("driverPhone")} /></Field>
-      <Field label="Assigned Route">
-        <select className="to-input" value={f.route} onChange={set("route")}>
-          <option value="">— None —</option>
-          {routes.map(r => <option key={r._id} value={r._id}>{r.routeNumber} — {r.routeName}</option>)}
+      <div className="to-grid-2">
+        <Field label="Current Odometer (km)" required>
+          <input className="to-input" type="number" min={0} value={f.odometer} onChange={setN("odometer")} placeholder="e.g. 15000" required />
+        </Field>
+        <Field label="Acquisition Cost (₹)" required>
+          <input className="to-input" type="number" min={0} value={f.acquisitionCost} onChange={setN("acquisitionCost")} placeholder="e.g. 2500000" required />
+        </Field>
+      </div>
+      <Field label="Status">
+        <select className="to-input" value={f.status} onChange={set("status")}>
+          {["Available", "In Shop", "Retired"].map(s => <option key={s}>{s}</option>)}
         </select>
       </Field>
       <SubmitBtn loading={loading} label={initial ? "Save Changes" : "Register Vehicle"} icon={Plus} />
@@ -1166,8 +1425,12 @@ function DriverForm({ initial, onSubmit }) {
   return (
     <form onSubmit={submit}>
       <div className="to-grid-2">
-        <Field label="Full Name" required><input className="to-input" value={f.name} onChange={set("name")} /></Field>
-        <Field label="License Number" required><input className="to-input" value={f.licenseNumber} onChange={set("licenseNumber")} /></Field>
+        <Field label="Full Name" required>
+          <input className="to-input" value={f.name} onChange={set("name")} placeholder="e.g. John Doe" minLength={2} maxLength={50} required />
+        </Field>
+        <Field label="License Number" required>
+          <input className="to-input" value={f.licenseNumber} onChange={set("licenseNumber")} placeholder="e.g. DL-14-2020-0001234" pattern="^[A-Z0-9-]{8,20}$" title="Valid Driving License format" required />
+        </Field>
       </div>
       <div className="to-grid-2">
         <Field label="Category">
@@ -1175,11 +1438,17 @@ function DriverForm({ initial, onSubmit }) {
             {["LMV", "HMV", "HPMV", "PSV"].map(c => <option key={c}>{c}</option>)}
           </select>
         </Field>
-        <Field label="Expiry Date" required><input className="to-input" type="date" value={f.licenseExpiry} onChange={set("licenseExpiry")} /></Field>
+        <Field label="Expiry Date" required>
+          <input className="to-input" type="date" value={f.licenseExpiry} onChange={set("licenseExpiry")} required />
+        </Field>
       </div>
       <div className="to-grid-2">
-        <Field label="Contact Number"><input className="to-input" value={f.contactNumber} onChange={set("contactNumber")} /></Field>
-        <Field label="Safety Score (0–100)"><input className="to-input" type="number" min={0} max={100} value={f.safetyScore} onChange={setN("safetyScore")} /></Field>
+        <Field label="Contact Number" required>
+          <input className="to-input" value={f.contactNumber} onChange={set("contactNumber")} placeholder="e.g. +91 9876543210" pattern="^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$" title="Valid phone number" required />
+        </Field>
+        <Field label="Safety Score (0–100)">
+          <input className="to-input" type="number" min={0} max={100} value={f.safetyScore} onChange={setN("safetyScore")} placeholder="80" />
+        </Field>
       </div>
       <Field label="Status">
         <select className="to-input" value={f.status} onChange={set("status")}>
@@ -1191,53 +1460,473 @@ function DriverForm({ initial, onSubmit }) {
   );
 }
 
-function TicketForm({ initial, buses, routes, onSubmit }) {
+function TripForm({ initial, vehicles, drivers, onSubmit }) {
   const [f, , set, setN] = useForm({
-    passenger:     initial?.passenger?._id || initial?.passenger || "",
-    bus:           initial?.bus?._id       || initial?.bus       || "",
-    route:         initial?.route?._id     || initial?.route     || "",
-    seatNumber:    initial?.seatNumber     || 1,
-    fare:          initial?.fare           || "",
-    travelDate:    initial?.travelDate?.slice(0, 10) || "",
-    status:        initial?.status         || "Booked",
-    paymentStatus: initial?.paymentStatus  || "Pending",
+    vehicle:       initial?.vehicle?._id || initial?.vehicle || "",
+    driver:        initial?.driver?._id  || initial?.driver  || "",
+    source:        initial?.source       || "",
+    destination:   initial?.destination  || "",
+    cargoWeight:   initial?.cargoWeight  || 0,
+    freightCharge: initial?.freightCharge|| 0,
+    status:        initial?.status       || "Draft",
   });
   const [loading, setLoading] = useState(false);
   const submit = async e => { e.preventDefault(); setLoading(true); await onSubmit(f); setLoading(false); };
   return (
     <form onSubmit={submit}>
       <div className="to-grid-2">
-        <Field label="Bus" required>
-          <select className="to-input" value={f.bus} onChange={set("bus")}>
-            <option value="">— Select Bus —</option>
-            {buses.map(b => <option key={b._id} value={b._id}>{b.busNumber} — {b.busName}</option>)}
+        <Field label="Vehicle" required>
+          <select className="to-input" value={f.vehicle} onChange={set("vehicle")} required>
+            <option value="">— Select Vehicle —</option>
+            {vehicles.map(v => <option key={v._id} value={v._id}>{v.registrationNumber} ({v.type})</option>)}
           </select>
         </Field>
-        <Field label="Route">
-          <select className="to-input" value={f.route} onChange={set("route")}>
-            <option value="">— Select Route —</option>
-            {routes.map(r => <option key={r._id} value={r._id}>{r.routeNumber} — {r.routeName}</option>)}
+        <Field label="Driver" required>
+          <select className="to-input" value={f.driver} onChange={set("driver")} required>
+            <option value="">— Select Driver —</option>
+            {drivers.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
           </select>
         </Field>
       </div>
       <div className="to-grid-2">
-        <Field label="Seat No." required><input className="to-input" type="number" min={1} value={f.seatNumber} onChange={setN("seatNumber")} /></Field>
-        <Field label="Fare (₹)" required><input className="to-input" type="number" min={0} value={f.fare} onChange={setN("fare")} /></Field>
-      </div>
-      <div className="to-grid-2">
-        <Field label="Travel Date" required><input className="to-input" type="date" value={f.travelDate} onChange={set("travelDate")} /></Field>
-        <Field label="Status">
-          <select className="to-input" value={f.status} onChange={set("status")}>
-            {["Booked", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}
-          </select>
+        <Field label="Origin City" required>
+          <input className="to-input" value={f.source} onChange={set("source")} placeholder="e.g. Mumbai Hub" minLength={2} required />
+        </Field>
+        <Field label="Destination City" required>
+          <input className="to-input" value={f.destination} onChange={set("destination")} placeholder="e.g. Delhi Distribution" minLength={2} required />
         </Field>
       </div>
-      <Field label="Payment Status">
-        <select className="to-input" value={f.paymentStatus} onChange={set("paymentStatus")}>
-          {["Paid", "Pending", "Failed"].map(s => <option key={s}>{s}</option>)}
+      <div className="to-grid-2">
+        <Field label="Cargo Weight (kg)" required>
+          <input className="to-input" type="number" min={1} max={50000} value={f.cargoWeight} onChange={setN("cargoWeight")} placeholder="e.g. 2500" required />
+        </Field>
+        <Field label="Freight Charge (₹)" required>
+          <input className="to-input" type="number" min={0} value={f.freightCharge} onChange={setN("freightCharge")} placeholder="e.g. 15000" required />
+        </Field>
+      </div>
+      <Field label="Status">
+        <select className="to-input" value={f.status} onChange={set("status")}>
+          {["Draft", "Dispatched", "Completed", "Cancelled"].map(s => <option key={s}>{s}</option>)}
         </select>
       </Field>
-      <SubmitBtn loading={loading} label={initial ? "Update Trip" : "Book Trip"} />
+      <SubmitBtn loading={loading} label={initial ? "Update Trip" : "Dispatch Trip"} />
     </form>
+  );
+}
+
+function TripCompleteForm({ initial, onSubmit }) {
+  const [f, , , setN] = useForm({
+    finalOdometer: initial?.vehicle?.odometer || 0,
+    fuelConsumed:  0,
+  });
+  const [loading, setLoading] = useState(false);
+  const submit = async e => { e.preventDefault(); setLoading(true); await onSubmit(f); setLoading(false); };
+  return (
+    <form onSubmit={submit}>
+      <Field label="Final Odometer (km)" required>
+        <input className="to-input" type="number" min={initial?.vehicle?.odometer || 0} value={f.finalOdometer} onChange={setN("finalOdometer")} placeholder={`e.g. ${(initial?.vehicle?.odometer || 15000) + 150}`} required />
+      </Field>
+      <Field label="Fuel Consumed (Liters)" required>
+        <input className="to-input" type="number" min={1} value={f.fuelConsumed} onChange={setN("fuelConsumed")} placeholder="e.g. 150" required />
+      </Field>
+      <SubmitBtn loading={loading} label="Complete Trip" icon={ArrowRight} />
+    </form>
+  );
+}
+
+/* ---------------------------------------------------------------
+   New Views (Maintenance, Fuel, Reports, Settings)
+--------------------------------------------------------------- */
+
+function MaintenanceView({ logs, vehicles, setModal, crud, loading, del }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const filteredLogs = React.useMemo(() => {
+    let data = [...logs];
+    
+    if (search.trim()) {
+      // Need to populate vehicle reg number for searching
+      const searchableData = data.map(l => ({
+        ...l,
+        vehReg: l.vehicle?.registrationNumber || vehicles.find(v => v._id === l.vehicle)?.registrationNumber || ""
+      }));
+      const fuse = new Fuse(searchableData, {
+        keys: ["vehReg", "type", "notes"],
+        threshold: 0.3,
+      });
+      data = fuse.search(search).map(res => res.item);
+    }
+    
+    if (filter !== "All") {
+      data = data.filter(l => l.status === filter);
+    }
+    return data.sort((a, b) => new Date(b.serviceDate) - new Date(a.serviceDate));
+  }, [logs, vehicles, search, filter]);
+
+  const statusColors = {
+    Scheduled:   { bg: "#DBEAFE", fg: "#1E40AF" },
+    "In Progress": { bg: "#FEF3C7", fg: "#92400E" },
+    Completed:   { bg: "#D1FAE5", fg: "#065F46" }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="to-fade-in">
+      <SectionHeader
+        title="Maintenance"
+        subtitle={`${logs.length} maintenance logs on record`}
+        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "maint-form", data: null })}>New Log</ActionButton>}
+      />
+
+      {/* Search + Filter bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border)" }}>
+        <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, padding: "0 10px", background: "var(--card-bg)" }}>
+          <Search size={15} style={{ opacity: 0.45, flexShrink: 0, color: "var(--text)" }} />
+          <input
+            type="text"
+            placeholder="Search by vehicle, type, or notes..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", padding: "9px 8px", width: "100%", color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}>
+          <option value="All">All Status</option>
+          <option value="Scheduled">Scheduled</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
+
+      {/* Cards */}
+      {filteredLogs.length === 0 ? (
+        <EmptyState text="No maintenance logs match your search or filters." />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {filteredLogs.map(l => {
+            const sc = statusColors[l.status] || statusColors.Scheduled;
+            const vehicle = typeof l.vehicle === "object" ? l.vehicle : vehicles.find(v => v._id === l.vehicle);
+            return (
+              <div key={l._id} className="to-card" style={{ borderRadius: 10, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{vehicle?.registrationNumber || "—"}</div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{l.type} Service</div>
+                  </div>
+                  <span style={{ background: sc.bg, color: sc.fg, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.4px" }}>
+                    {(l.status || "UNKNOWN").toUpperCase()}
+                  </span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, color: C.textMuted, marginBottom: 16, padding: "12px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Date:</span><br/>{fmtDate(l.serviceDate)}</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Cost:</span><br/>₹{l.cost.toLocaleString()}</div>
+                  {l.notes && <div style={{ gridColumn: "span 2" }}><span style={{ fontWeight: 600, color: "var(--text)" }}>Notes:</span><br/>{l.notes}</div>}
+                </div>
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button className="to-btn-ghost" onClick={() => setModal({ type: "maint-form", data: l })} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <button className="to-btn-danger" onClick={del(crud.deleteMaint, l._id, "Delete log?")} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MaintenanceForm({ initial, vehicles, onSubmit }) {
+  const [f, , set, setN] = useForm({
+    vehicle: initial?.vehicle?._id || initial?.vehicle || "",
+    serviceDate: initial?.serviceDate?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    type: initial?.type || "Routine",
+    cost: initial?.cost || 0,
+    status: initial?.status || "Scheduled",
+    notes: initial?.notes || "",
+  });
+  const [loading, setLoading] = useState(false);
+  const submit = async e => { e.preventDefault(); setLoading(true); await onSubmit(f); setLoading(false); };
+  return (
+    <form onSubmit={submit}>
+      <div className="to-grid-2">
+        <Field label="Vehicle" required>
+          <select className="to-input" value={f.vehicle} onChange={set("vehicle")} required>
+            <option value="">— Select Vehicle —</option>
+            {vehicles.map(v => <option key={v._id} value={v._id}>{v.registrationNumber}</option>)}
+          </select>
+        </Field>
+        <Field label="Service Date" required>
+          <input className="to-input" type="date" value={f.serviceDate} onChange={set("serviceDate")} required />
+        </Field>
+      </div>
+      <div className="to-grid-2">
+        <Field label="Type">
+          <select className="to-input" value={f.type} onChange={set("type")}>
+            {["Routine", "Repair", "Inspection"].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Cost (₹)" required>
+          <input className="to-input" type="number" min={0} value={f.cost} onChange={setN("cost")} placeholder="e.g. 5000" required />
+        </Field>
+      </div>
+      <Field label="Status">
+        <select className="to-input" value={f.status} onChange={set("status")}>
+          {["Scheduled", "In Progress", "Completed"].map(s => <option key={s}>{s}</option>)}
+        </select>
+      </Field>
+      <Field label="Notes">
+        <textarea className="to-input" value={f.notes} onChange={set("notes")} rows={2} placeholder="e.g. Oil change and brake pad replacement" maxLength={500} />
+      </Field>
+      <SubmitBtn loading={loading} label={initial ? "Update Log" : "Add Log"} />
+    </form>
+  );
+}
+
+function FuelView({ expenses, vehicles, setModal, crud, loading, del }) {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const filteredExpenses = React.useMemo(() => {
+    let data = [...expenses];
+    
+    if (search.trim()) {
+      const searchableData = data.map(e => ({
+        ...e,
+        vehReg: e.vehicle?.registrationNumber || vehicles.find(v => v._id === e.vehicle)?.registrationNumber || ""
+      }));
+      const fuse = new Fuse(searchableData, {
+        keys: ["vehReg", "category"],
+        threshold: 0.3,
+      });
+      data = fuse.search(search).map(res => res.item);
+    }
+    
+    if (filter !== "All") {
+      data = data.filter(e => e.status === filter);
+    }
+    return data.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [expenses, vehicles, search, filter]);
+
+  const statusColors = {
+    Pending:  { bg: "#FEE2E2", fg: "#991B1B" },
+    Approved: { bg: "#FEF3C7", fg: "#92400E" },
+    Paid:     { bg: "#D1FAE5", fg: "#065F46" }
+  };
+
+  if (loading) return <Spinner />;
+
+  return (
+    <div className="to-fade-in">
+      <SectionHeader
+        title="Fuel & Expenses"
+        subtitle={`${expenses.length} expense logs on record`}
+        action={<ActionButton icon={Plus} onClick={() => setModal({ type: "fuel-form", data: null })}>Log Expense</ActionButton>}
+      />
+
+      {/* Search + Filter bar */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap", background: "var(--card-bg)", padding: 16, borderRadius: 8, border: "1px solid var(--border)" }}>
+        <div style={{ flex: 1, minWidth: 220, display: "flex", alignItems: "center", border: "1px solid var(--border)", borderRadius: 6, padding: "0 10px", background: "var(--card-bg)" }}>
+          <Search size={15} style={{ opacity: 0.45, flexShrink: 0, color: "var(--text)" }} />
+          <input
+            type="text"
+            placeholder="Search by vehicle or category..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ border: "none", outline: "none", background: "transparent", padding: "9px 8px", width: "100%", color: "var(--text)", fontSize: 13 }}
+          />
+        </div>
+        <select value={filter} onChange={e => setFilter(e.target.value)} style={{ padding: "8px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text)", fontSize: 13 }}>
+          <option value="All">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Paid">Paid</option>
+        </select>
+      </div>
+
+      {/* Cards */}
+      {filteredExpenses.length === 0 ? (
+        <EmptyState text="No expenses match your search or filters." />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {filteredExpenses.map(e => {
+            const sc = statusColors[e.status] || statusColors.Pending;
+            const vehicle = typeof e.vehicle === "object" ? e.vehicle : vehicles.find(v => v._id === e.vehicle);
+            return (
+              <div key={e._id} className="to-card" style={{ borderRadius: 10, padding: 20 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>₹{e.amount.toLocaleString()}</div>
+                    <div style={{ fontSize: 13, color: C.textMuted, marginTop: 2 }}>{e.category}</div>
+                  </div>
+                  <span style={{ background: sc.bg, color: sc.fg, padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, letterSpacing: "0.4px" }}>
+                    {(e.status || "UNKNOWN").toUpperCase()}
+                  </span>
+                </div>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 12, color: C.textMuted, marginBottom: 16, padding: "12px 0", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Date:</span><br/>{fmtDate(e.date)}</div>
+                  <div><span style={{ fontWeight: 600, color: "var(--text)" }}>Vehicle:</span><br/>{vehicle?.registrationNumber || "—"}</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button className="to-btn-ghost" onClick={() => setModal({ type: "fuel-form", data: e })} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Edit size={13} /> Edit
+                  </button>
+                  <button className="to-btn-danger" onClick={del(crud.deleteExp, e._id, "Delete expense?")} style={{ padding: "6px 12px", borderRadius: 6, display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600 }}>
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FuelForm({ initial, vehicles, onSubmit }) {
+  const [f, , set, setN] = useForm({
+    vehicle: initial?.vehicle?._id || initial?.vehicle || "",
+    date: initial?.date?.slice(0, 10) || new Date().toISOString().slice(0, 10),
+    category: initial?.category || "Fuel",
+    amount: initial?.amount || 0,
+    status: initial?.status || "Pending",
+  });
+  const [loading, setLoading] = useState(false);
+  const submit = async e => { e.preventDefault(); setLoading(true); await onSubmit(f); setLoading(false); };
+  return (
+    <form onSubmit={submit}>
+      <div className="to-grid-2">
+        <Field label="Category">
+          <select className="to-input" value={f.category} onChange={set("category")}>
+            {["Fuel", "Toll", "Maintenance", "Other"].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Date" required>
+          <input className="to-input" type="date" value={f.date} onChange={set("date")} required />
+        </Field>
+      </div>
+      <div className="to-grid-2">
+        <Field label="Amount (₹)" required>
+          <input className="to-input" type="number" min={0} value={f.amount} onChange={setN("amount")} placeholder="e.g. 1200" required />
+        </Field>
+        <Field label="Vehicle (Optional)">
+          <select className="to-input" value={f.vehicle} onChange={set("vehicle")}>
+            <option value="">— None —</option>
+            {vehicles.map(v => <option key={v._id} value={v._id}>{v.registrationNumber}</option>)}
+          </select>
+        </Field>
+      </div>
+      <Field label="Status">
+        <select className="to-input" value={f.status} onChange={set("status")}>
+          {["Pending", "Approved", "Paid"].map(s => <option key={s}>{s}</option>)}
+        </select>
+      </Field>
+      <SubmitBtn loading={loading} label={initial ? "Update Expense" : "Log Expense"} />
+    </form>
+  );
+}
+
+function ReportsView({ data, loading }) {
+  if (loading) return <Spinner />;
+  if (!data) return null;
+  return (
+    <div className="to-fade-in">
+      <div className="to-section-header" style={{ marginBottom: 20 }}>
+        <h1 className="to-serif" style={{ fontSize: 28, margin: 0, color: C.royal }}>Reports & Analytics</h1>
+        <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 13 }}>Vehicle Return on Investment (ROI).</p>
+      </div>
+      <div className="to-kpi-row" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+        <KPITile label="Total Revenue (₹)" value={data.totalRevenue} />
+        <KPITile label="Total Expenses (₹)" value={data.totalExpenses} />
+        <KPITile label="Net Profit (₹)" value={data.netProfit} />
+      </div>
+      
+      <div className="to-card to-table-wrap" style={{ borderRadius: 10, marginTop: 20 }}>
+        <div style={{ padding: "16px 20px", fontSize: 14, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>Vehicle Performance</div>
+        <table className="to-table">
+          <thead><tr>
+            <th>VEHICLE</th>
+            <th>REVENUE</th>
+            <th>EXPENSES</th>
+            <th>ACQUISITION</th>
+            <th>ROI (%)</th>
+          </tr></thead>
+          <tbody>
+            {!data.vehicleROI || data.vehicleROI.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: "center", padding: 30, color: C.textMuted }}>No performance data.</td></tr>
+            ) : (
+              data.vehicleROI.map(v => (
+                <tr key={v.vehicleId} className="to-row">
+                  <td className="to-mono" style={{ fontWeight: 600 }}>{v.registrationNumber}</td>
+                  <td>₹{v.revenue}</td>
+                  <td>₹{v.expenses}</td>
+                  <td>₹{v.acquisitionCost}</td>
+                  <td>
+                    <span style={{ fontWeight: 700, color: v.roiPercentage >= 0 ? C.green : C.red }}>
+                      {v.roiPercentage}%
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function SettingsView({ users, user, crud, loading }) {
+  if (loading) return <Spinner />;
+  return (
+    <div className="to-fade-in">
+      <div className="to-section-header" style={{ marginBottom: 20 }}>
+        <h1 className="to-serif" style={{ fontSize: 28, margin: 0, color: C.royal }}>Settings & RBAC</h1>
+        <p style={{ margin: "4px 0 0", color: C.textMuted, fontSize: 13 }}>Manage users, roles, and permissions.</p>
+      </div>
+      
+      {user?.role !== "admin" && user?.role !== "fleet" ? (
+        <div className="to-card" style={{ padding: 24, borderRadius: 10, textAlign: "center", color: C.red }}>
+          <AlertTriangle size={24} style={{ marginBottom: 10 }} />
+          <div>You do not have permission to view or edit system users.</div>
+        </div>
+      ) : (
+        <div className="to-card to-table-wrap" style={{ borderRadius: 10, padding: 2 }}>
+          <table className="to-table">
+            <thead><tr><th>USER</th><th>EMAIL</th><th>ROLE</th><th>ACTIONS</th></tr></thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u._id} className="to-row">
+                  <td style={{ fontWeight: 600 }}>{u.name} {user._id === u._id && <span style={{fontSize: 10, color: C.blue}}>(You)</span>}</td>
+                  <td>{u.email}</td>
+                  <td><StatusBadge status={u.role.toUpperCase()} /></td>
+                  <td>
+                    {user._id !== u._id && (
+                      <select className="to-input" style={{ width: 140, padding: "4px 8px" }} value={u.role} 
+                        onChange={e => crud.updateUser(u._id, e.target.value)}>
+                        <option value="admin">Admin</option>
+                        <option value="fleet">Fleet Manager</option>
+                        <option value="driver">Driver</option>
+                        <option value="user">User</option>
+                      </select>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
